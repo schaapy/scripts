@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+USER=$1
+PASS=$2
+
+touch /tmp/pass$USER
+cat << EOF > /tmp/pass$USER
+$PASS
+$PASS
+EOF
+
+pure-pw useradd $USER -d /home/$USER -u `id -u $USER` -g `id -g $USER` < /tmp/pass$USER
+
+pure-pw mkdb

@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+
+if [ $# -lt 3 ]
+then
+  echo "Usage: <domain> <username> <password>"
+  exit 1
+fi
+
+# Set some variables from the argument list
+DOMAIN=$1
+USER=$2
+PASS=$3
+
+
+# User
+#################################
+useradd -d /home/$USER -m $USER
+
+expect << EOF
+spawn passwd $USER
+expect "Enter new UNIX password:"
+send "${PASS}\r"
+expect "Retype new UNIX password:"
+send "${PASS}\r"
+expect eof;
+EOF
+#################################
+
+# Apache
+#################################
+
+# Docroot
+
+mkdir -p /home/$USER/$DOMAIN/logs
+mkdir -p /home/$USER/$DOMAIN/public
+
+# Log files
+touch /home/$USER/$DOMAIN/logs/apache.access.log common
+touch /home/$USER/$DOMAIN/logs/apache.error.log
+
+# create vhost
+mkdir -p /var/user-conf/$USER
+
+cat << EOF >> /var/user-conf/$USER/apache.conf
+<VirtualHost $(/sbin/ifconfig eth0 | grep 'inet addr:' | cut -d: -f2 | awk '{ print $1}'):80>
+  ServerName $DOMAIN
+  ServerAlias www.$DOMAIN
+
+  SuexecUserGroup $USER $USER
+
+  suPHP_Engine on
+  suPHP_UserGroup $USER $USER
+  AddHandler x-httpd-php .php .php3 .php4
+  suPHP_AddHandler x-httpd-php
+  AddHandler x-httpd-php5 .php5
+  suPHP_AddHandler x-httpd-php5
+
+  DocumentRoot /home/$USER/$DOMAIN/public/
+
+  <Directory "/home/$USER/$DOMAIN/public/" >
+    Options FollowSymLinks
+    AllowOverride All
+    Order allow,deny
+    Allow from all
+  </Directory>
+
+  CustomLog  /home/$USER/$DOMAIN/logs/apache.access.log common
+  ErrorLog   /home/$USER/$DOMAIN/logs/apache.error.log
+</VirtualHost>
+EOF
+
+if [ ! -e /var/user-conf/etc/apache.d/$USER ]
+then
+  ln -s /var/user-conf/$USER/apache.conf /var/user-conf/etc/apache.d/$USER
+fi
+#################################
+
+# Logrotate
+#################################
+
+# Create logrotate config
+
+cat << EOF > /var/user-conf/$USER/logrotate.conf
+/home/$USER/$DOMAIN/logs/*.log {
+  copytruncate
+  rotate 5
+  size 10M
+  compress
+  missingok
+  notifempty
+}
+
+if [ ! -e /var/user-conf/etc/logrotate.d/$USER ]
+then
+ln -s /var/user-conf/$USER/logrotate.conf /var/user-conf/etc/logrotate.d/$USER
+fi
+
+#################################
+
+# FTP
+#################################
+
+/scripts/ftp $USER '$PASS'
+
+chown -R $USER:$USER /home/$USER
