@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+DOMAIN=$1
+USER=$2
+
+mkdir -p /home/$USER/$DOMAIN/public
+mkdir -p /var/user-conf/$USER
+mkdir -p /home/$USER/$DOMAIN/logs
+
+touch /home/$USER/$DOMAIN/logs/apache.access.log
+touch /home/$USER/$DOMAIN/logs/apache.error.log
+
+cat << EOF >> /var/user-conf/$USER/apache.conf
+<VirtualHost $(/sbin/ifconfig eth0 | grep 'inet addr:' | cut -d: -f2 | awk '{ print $1}'):80>
+  ServerName $DOMAIN
+  ServerAlias www.$DOMAIN
+
+  SuexecUserGroup $USER $USER
+
+  suPHP_Engine on
+  suPHP_UserGroup $USER $USER
+  AddHandler x-httpd-php .php .php3 .php4
+  suPHP_AddHandler x-httpd-php
+  AddHandler x-httpd-php5 .php5
+  suPHP_AddHandler x-httpd-php5
+
+  DocumentRoot /home/$USER/$DOMAIN/public/
+
+  <Directory "/home/$USER/$DOMAIN/public/" >
+    Options FollowSymLinks
+    AllowOverride All
+    Order allow,deny
+    Allow from all
+  </Directory>
+
+  CustomLog  /home/$USER/$DOMAIN/logs/apache.access.log common
+  ErrorLog   /home/$USER/$DOMAIN/logs/apache.error.log
+</VirtualHost>
+EOF
+
+chown -R $USER. /home/$USER/$DOMAIN
