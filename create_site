@@ -100,6 +100,6 @@ fi
 # FTP
 #################################
 
-/scripts/ftp $USER '$PASS'
+/scripts/create_ftp $USER '$PASS'
 
 chown -R $USER:$USER /home/$USER
