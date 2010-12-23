@@ -89,6 +89,7 @@ cat << EOF > /var/user-conf/$USER/logrotate.conf
   missingok
   notifempty
 }
+EOF
 
 if [ ! -e /var/user-conf/etc/logrotate.d/$USER ]
 then
